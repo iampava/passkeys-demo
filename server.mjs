@@ -151,6 +151,16 @@ app.get('/.well-known/passkey-endpoints', (req, res) => {
   return res.json({ enroll: web_endpoint, manage: web_endpoint });
 });
 
+app.get('/api/projects', async (req, res) => {
+  try {
+    const projects = await Projects.list();
+    return res.json(projects);
+  } catch (error) {
+    console.error('Failed to fetch projects:', error);
+    return res.status(500).json({ error: 'Failed to fetch projects' });
+  }
+});
+
 app.use('/auth', auth);
 
 async function initializeProjects() {
