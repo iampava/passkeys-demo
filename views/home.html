@@ -1,302 +1,345 @@
-    <div id="help">
-      <div class="help-headline">
-        Manage passkeys
-      </div>
-      <div class="help-content">
+<div id="help">
+  <div class="help-headline">Manage passkeys</div>
+  <div class="help-content">
+    Edit your display name, create a passkey, or manage your passkeys. Once you
+    create your first passkey, sign out and try signing in with it. ### Display
+    name Created passkeys are saved with your username and a display name. Edit
+    your display name to see how it appears in the account selection of your
+    passkey sign-in. If the browser and the password manager support the [Signal
+    API](https://developer.chrome.com/docs/identity/webauthn-signal-api),
+    updated display name can be reflected to passkeys stored to the password
+    manager. ### Create a passkey Press **Create a passkey** to create a new
+    passkey. The passkey is named based on its
+    [AAGUID](https://web.dev/articles/webauthn-aaguid), but you can change it as
+    you want. ### Manage passkeys Press the **Edit** button to rename a passkey,
+    or press the **Delete** button to remove it. If the browser and the password
+    manager support the [Signal
+    API](https://developer.chrome.com/docs/identity/webauthn-signal-api),
+    updated list of passkeys can be reflected to the password manager. ### Learn
+    more Learn how to [Create a passkey for passwordless
+    logins](https://web.dev/articles/passkey-registration) and build
+    [Server-side passkey
+    registration](https://developers.google.com/identity/passkeys/developer-guides/server-registration).
+    Learn how to use the Signal API at [Keep passkeys consistent with
+    credentials on your server with the Signal API
+    ](https://developer.chrome.com/docs/identity/webauthn-signal-api) and
+    [Determine the passkey provider with
+    AAGUID](https://web.dev/articles/webauthn-aaguid).
+  </div>
+</div>
+<main class="content center">
+  <h2>Welcome, {{displayName}}!</h2>
+  <section>
+    <h3>Your display name:</h3>
+    <div id="display-name"></div>
+  </section>
+  <section class="projects-card">
+    <h3>Projects:</h3>
+    <div id="projects-list"></div>
+  </section>
+  <section>
+    <h3>Your registered passkeys:</h3>
+    <div id="list"></div>
+  </section>
+  <p id="message" class="instructions"></p>
+  <mdui-button variant="outlined" href="/auth/signout">Sign out</mdui-button>
+</main>
+<script type="module">
+  import {
+    $,
+    post,
+    loading,
+    registerCredential,
+    updateCredential,
+    unregisterCredential,
+    getAllCredentials,
+    updateCurrentUserDetails,
+    getAllProjects,
+    updateProjectColor,
+  } from "/client.js";
+  import {
+    html,
+    render,
+  } from "https://unpkg.com/lit-html@2.6.1/lit-html.js?module";
+  const aaguids = await fetch("/auth/aaguids").then((res) => res.json());
 
-        Edit your display name, create a passkey, or manage your passkeys. Once
-        you create your first passkey, sign out and try signing in with it.
+  /**
+   * Change and update the user's display name.
+   */
+  async function changeDisplayName(e) {
+    const newName = prompt(
+      "Enter a new display name",
+      e.target.dataset.displayName
+    );
+    if (newName) {
+      loading.start();
+      await post("/auth/updateDisplayName", { newName });
+      loading.stop();
+      renderDisplayName();
+    }
+  }
 
-        ### Display name
+  /**
+   * Render the user's display name.
+   */
+  async function renderDisplayName() {
+    const res = await post("/auth/userinfo");
+    render(
+      html` <mdui-list>
+        <mdui-list-item nonclickable>
+          ${res.displayName || res.username}
+          <mdui-button-icon
+            data-display-name="${res.displayName || res.username}"
+            @click="${changeDisplayName}"
+            title="Edit your display name"
+            icon="edit"
+            slot="end-icon"
+          ></mdui-button-icon>
+        </mdui-list-item>
+        <mwc-list></mwc-list
+      ></mdui-list>`,
+      $("#display-name")
+    );
+    await updateCurrentUserDetails(
+      res.rpId,
+      res.id,
+      res.username,
+      res.displayName
+    );
+  }
 
-        Created passkeys are saved with your username and a display name. Edit
-        your display name to see how it appears in the account selection of your
-        passkey sign-in.
+  /**
+   * Handle project color change.
+   */
+  async function changeProjectColor(e) {
+    const projectId = e.target.dataset.projectId;
+    const newColor = e.target.value;
+    try {
+      loading.start();
+      await updateProjectColor(projectId, newColor);
+      loading.stop();
+    } catch (error) {
+      loading.stop();
+      console.error("Failed to update project color:", error);
+      alert("Failed to update project color");
+    }
+  }
 
-        If the browser and the password manager support the [Signal
-        API](https://developer.chrome.com/docs/identity/webauthn-signal-api),
-        updated display name can be reflected to passkeys stored to the password
-        manager.
+  /**
+   * Render the list of projects.
+   */
+  async function renderProjects() {
+    try {
+      const projects = await getAllProjects();
+      const projectsList = $("#projects-list");
 
-        ### Create a passkey
-
-        Press **Create a passkey** to create a new passkey. The passkey is named
-        based on its [AAGUID](https://web.dev/articles/webauthn-aaguid), but you
-        can change it as you want.
-
-        ### Manage passkeys
-        
-        Press the **Edit** button to rename a passkey, or press the **Delete**
-        button to remove it.
-
-        If the browser and the password manager support the [Signal
-        API](https://developer.chrome.com/docs/identity/webauthn-signal-api),
-        updated list of passkeys can be reflected to the password manager.
-
-        ### Learn more
-
-        Learn how to [Create a passkey for passwordless
-        logins](https://web.dev/articles/passkey-registration) and build
-        [Server-side passkey
-        registration](https://developers.google.com/identity/passkeys/developer-guides/server-registration).
-
-        Learn how to use the Signal API at [Keep passkeys consistent with
-        credentials on your server with the Signal API
-        ](https://developer.chrome.com/docs/identity/webauthn-signal-api) and
-        [Determine the passkey provider with
-        AAGUID](https://web.dev/articles/webauthn-aaguid).
-
-      </div>
-    </div>
-    <main class="content center">
-      <h2>Welcome, {{displayName}}!</h2>
-      <section>
-        <h3>Your display name:</h3>
-        <div id="display-name"></div>
-      </section>
-      <section class="projects-card">
-        <h3>Projects:</h3>
-        <div id="projects-list"></div>
-      </section>
-      <section>
-        <h3>Your registered passkeys:</h3>
-        <div id="list"></div>
-      </section>
-      <p id="message" class="instructions"></p>
-      <mdui-button variant="outlined" href="/auth/signout">Sign out</mdui-button>
-    </main>
-    <script type="module">
-      import {
-        $,
-        post,
-        loading,
-        registerCredential,
-        updateCredential,
-        unregisterCredential,
-        getAllCredentials,
-        updateCurrentUserDetails,
-        getAllProjects
-      } from '/client.js';
-      import { html, render } from 'https://unpkg.com/lit-html@2.6.1/lit-html.js?module';
-      const aaguids = await fetch('/auth/aaguids').then(res => res.json());
-
-      /**
-       * Change and update the user's display name.
-       */
-      async function changeDisplayName(e) {
-        const newName = prompt('Enter a new display name', e.target.dataset.displayName);
-        if (newName) {
-          loading.start();
-          await post('/auth/updateDisplayName', { newName });
-          loading.stop();
-          renderDisplayName();
-        }
+      // Check WebAuthn capability
+      let showCreateButton = false;
+      if (window.PublicKeyCredential) {
+        const capabilities = await PublicKeyCredential.getClientCapabilities();
+        showCreateButton =
+          capabilities.conditionalGet &&
+          capabilities.userVerifyingPlatformAuthenticator;
       }
 
-      /**
-       * Render the user's display name.
-       */
-      async function renderDisplayName() {
-        const res = await post('/auth/userinfo');
-        render(html`
-        <mdui-list>
-          <mdui-list-item nonclickable>
-            ${res.displayName || res.username}
-            <mdui-button-icon
-              data-display-name="${res.displayName || res.username }"
-              @click="${changeDisplayName}"
-              title="Edit your display name"
-              icon="edit"
-              slot="end-icon"></mdui-button-icon>
-          </mdui-list-item>
-        <mwc-list>`, $('#display-name'));
-        await updateCurrentUserDetails(res.rpId, res.id, res.username, res.displayName);
-      };
-
-      /**
-       * Render the list of projects.
-       */
-      async function renderProjects() {
-        try {
-          const projects = await getAllProjects();
-          const projectsList = $('#projects-list');
-          
-          // Check WebAuthn capability
-          let showCreateButton = false;
-          if (window.PublicKeyCredential) {
-            const capabilities = await PublicKeyCredential.getClientCapabilities();
-            showCreateButton = capabilities.conditionalGet && capabilities.userVerifyingPlatformAuthenticator;
-          }
-          
-          const projectsHtml = html`${projects.length > 0 ? html`
-          <mdui-list style="width: 100%;">${projects.map(project => html`
-            <mdui-list-item nonclickable>
-              <div style="width: 20px; height: 20px; background-color: ${project.color}; border-radius: 4px; margin-right: 12px;" slot="icon"></div>
-              ${project.name}
-              <div slot="description">ID: ${project.id}</div>
-              ${showCreateButton ? html`
-              <mdui-button
-                class="create-passkey-btn"
-                icon="fingerprint"
-                variant="tonal"
-                @click="${register}"
-                slot="end-icon">
-                Create passkey
-              </mdui-button>` : ''}
-            </mdui-list-item>`)}
-          </mdui-list>` : html`
-          <mdui-list>
+      const projectsHtml = html`${projects.length > 0
+        ? html` <mdui-list style="width: 100%;"
+            >${projects.map(
+              (project) => html` <mdui-list-item nonclickable>
+                <input
+                  type="color"
+                  value="${project.color}"
+                  data-project-id="${project.id}"
+                  @change="${changeProjectColor}"
+                  style="width: 42px; height: 42px; border: none; border-radius: 4px; cursor: pointer;"
+                  slot="icon"
+                />
+                ${project.name}
+                <div slot="description">ID: ${project.id}</div>
+                ${showCreateButton
+                  ? html` <mdui-button
+                      class="create-passkey-btn"
+                      icon="fingerprint"
+                      variant="tonal"
+                      @click="${register}"
+                      slot="end-icon"
+                    >
+                      Create passkey
+                    </mdui-button>`
+                  : ""}
+              </mdui-list-item>`
+            )}
+          </mdui-list>`
+        : html` <mdui-list>
             <mdui-list-item>No projects found.</mdui-list-item>
           </mdui-list>`}`;
-          render(projectsHtml, projectsList);
-        } catch (error) {
-          console.error('Failed to render projects:', error);
-          const projectsList = $('#projects-list');
-          render(html`
-          <mdui-list>
-            <mdui-list-item>Failed to load projects.</mdui-list-item>
-          </mdui-list>`, projectsList);
-        }
-      };
+      render(projectsHtml, projectsList);
+    } catch (error) {
+      console.error("Failed to render projects:", error);
+      const projectsList = $("#projects-list");
+      render(
+        html` <mdui-list>
+          <mdui-list-item>Failed to load projects.</mdui-list-item>
+        </mdui-list>`,
+        projectsList
+      );
+    }
+  }
 
-      /**
-       * Rename and update the credential name.
-       */
-      async function rename(e) {
-        const { credId, name } = e.target.dataset;
-        const newName = prompt('Enter a new credential name.', name);
-        if (newName.length === 0) return;
-        try {
-          loading.start();
-          await updateCredential(credId, newName);
-          await renderCredentials();
-          loading.stop();
-        } catch (e) {
-          loading.stop();
-          console.error(e);
-          alert(e.message);
-        }
-      };
-
-      /**
-       * Remove and delete a credential.
-       */
-      async function remove(e) {
-        if (!confirm('Do you really want to remove this credential?')) return;
-
-        try {
-          loading.start();
-          await unregisterCredential(e.target.dataset.credId);
-          await renderCredentials();
-          loading.stop();
-        } catch (e) {
-          loading.stop();
-          console.error(e);
-          alert(e.message);
-        }
-      };
-
-      // Check WebAuthn capability for messaging
-      if (!window.PublicKeyCredential) {
-        $('#message').innerText = 'This device does not support passkeys.';
-      } else {
-        const capabilities = await PublicKeyCredential.getClientCapabilities();
-        if (!capabilities.conditionalGet || !capabilities.userVerifyingPlatformAuthenticator) {
-          $('#message').innerText = 'This device does not support passkeys.';
-        }
-      }
-
-      /**
-       * Render the list of saved credentials.
-       */
-      async function renderCredentials() {
-        // TODO: What if this get exception?
-        const res = await getAllCredentials();
-        const list = $('#list');
-        const creds = html`${res.length > 0 ? html`
-        <mdui-list>${res.map(cred => {
-          const created = new Date(cred.registered);
-          const createdDate = created.toLocaleDateString(undefined, {
-            month: 'short',
-            day: 'numeric',
-          });
-          const createdTime = created.toLocaleTimeString(undefined, {
-            timeStyle: 'short',
-            hour12: false,
-          });
-          const createdStr = `Created: ${createdDate}, ${createdTime}`;
-          let lastUsedStr = '';
-          if (cred.last_used) {
-            const lastUsed = new Date(cred.last_used);
-            const lastUsedDate = lastUsed.toLocaleDateString(undefined, {
-              month: 'short',
-              day: 'numeric',
-            });
-            const lastUsedTime = lastUsed.toLocaleTimeString(undefined, {
-              timeStyle: 'short',
-              hour12: false,
-            });
-            lastUsedStr = cred.last_used?`, Last Used: ${lastUsedDate}, ${lastUsedTime}`:'';
-          }
-          return html`
-          <mdui-list-item nonclickable>
-            ${cred.aaguid && cred.aaguid !== '00000000-0000-0000-0000-000000000000'
-            ?html`
-            <mdui-icon slot="icon" nonclickable src="${aaguids[cred.aaguid].icon_light}"></mdui-icon>
-            `:''}
-            ${cred.name || 'Unnamed' }
-            <div slot="description">${createdStr}${lastUsedStr}</div>
-            <div class="buttons" slot="end-icon">
-              ${cred.be === false?html`
-              <mdui-button-icon
-                icon="sync_disabled"></mdui-button-icon>`:''}
-              <mdui-button-icon
-                data-cred-id="${cred.id}"
-                data-name="${cred.name || 'Unnamed' }"
-                @click="${rename}"
-                icon="edit"></mdui-button-icon>
-              <mdui-button-icon
-                data-cred-id="${cred.id}"
-                @click="${remove}"
-                icon="delete"></mdui-button-icon>
-            </div>
-          </mdui-list-item>`})}
-        </mdui-list>` : html`
-        <mdui-list>
-          <mdui-list-item>No credentials found.</mdui-list-item>
-        </mdui-list>`}`;
-        render(creds, list);
-      };
-
-      /**
-       * Create a new paskey and register the credential.
-       */
-      async function register() {
-        try {
-          loading.start();
-          await registerCredential();
-          await renderCredentials();
-          loading.stop();
-        } catch (e) {
-          // Stop the loading UI
-          loading.stop();
-          // 'InvalidStateError' indicates a passkey already exists on the device.
-          if (e.name === 'InvalidStateError') {
-            alert('A passkey already exists for this device.');
-          // `NotAllowedError` indicates the user canceled the operation.
-          } else if (e.name === 'NotAllowedError') {
-            return;
-          // Show other errors in an alert.
-          } else {
-            alert(e.message);
-            console.error(e);
-          }
-        }
-      };
-
+  /**
+   * Rename and update the credential name.
+   */
+  async function rename(e) {
+    const { credId, name } = e.target.dataset;
+    const newName = prompt("Enter a new credential name.", name);
+    if (newName.length === 0) return;
+    try {
       loading.start();
-      renderDisplayName();
-      await renderProjects();
+      await updateCredential(credId, newName);
       await renderCredentials();
       loading.stop();
-    </script>
+    } catch (e) {
+      loading.stop();
+      console.error(e);
+      alert(e.message);
+    }
+  }
+
+  /**
+   * Remove and delete a credential.
+   */
+  async function remove(e) {
+    if (!confirm("Do you really want to remove this credential?")) return;
+
+    try {
+      loading.start();
+      await unregisterCredential(e.target.dataset.credId);
+      await renderCredentials();
+      loading.stop();
+    } catch (e) {
+      loading.stop();
+      console.error(e);
+      alert(e.message);
+    }
+  }
+
+  // Check WebAuthn capability for messaging
+  if (!window.PublicKeyCredential) {
+    $("#message").innerText = "This device does not support passkeys.";
+  } else {
+    const capabilities = await PublicKeyCredential.getClientCapabilities();
+    if (
+      !capabilities.conditionalGet ||
+      !capabilities.userVerifyingPlatformAuthenticator
+    ) {
+      $("#message").innerText = "This device does not support passkeys.";
+    }
+  }
+
+  /**
+   * Render the list of saved credentials.
+   */
+  async function renderCredentials() {
+    // TODO: What if this get exception?
+    const res = await getAllCredentials();
+    const list = $("#list");
+    const creds = html`${res.length > 0
+      ? html` <mdui-list
+          >${res.map((cred) => {
+            const created = new Date(cred.registered);
+            const createdDate = created.toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+            });
+            const createdTime = created.toLocaleTimeString(undefined, {
+              timeStyle: "short",
+              hour12: false,
+            });
+            const createdStr = `Created: ${createdDate}, ${createdTime}`;
+            let lastUsedStr = "";
+            if (cred.last_used) {
+              const lastUsed = new Date(cred.last_used);
+              const lastUsedDate = lastUsed.toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+              });
+              const lastUsedTime = lastUsed.toLocaleTimeString(undefined, {
+                timeStyle: "short",
+                hour12: false,
+              });
+              lastUsedStr = cred.last_used
+                ? `, Last Used: ${lastUsedDate}, ${lastUsedTime}`
+                : "";
+            }
+            return html` <mdui-list-item nonclickable>
+              ${cred.aaguid &&
+              cred.aaguid !== "00000000-0000-0000-0000-000000000000"
+                ? html`
+                    <mdui-icon
+                      slot="icon"
+                      nonclickable
+                      src="${aaguids[cred.aaguid].icon_light}"
+                    ></mdui-icon>
+                  `
+                : ""}
+              ${cred.name || "Unnamed"}
+              <div slot="description">${createdStr}${lastUsedStr}</div>
+              <div class="buttons" slot="end-icon">
+                ${cred.be === false
+                  ? html` <mdui-button-icon
+                      icon="sync_disabled"
+                    ></mdui-button-icon>`
+                  : ""}
+                <mdui-button-icon
+                  data-cred-id="${cred.id}"
+                  data-name="${cred.name || "Unnamed"}"
+                  @click="${rename}"
+                  icon="edit"
+                ></mdui-button-icon>
+                <mdui-button-icon
+                  data-cred-id="${cred.id}"
+                  @click="${remove}"
+                  icon="delete"
+                ></mdui-button-icon>
+              </div>
+            </mdui-list-item>`;
+          })}
+        </mdui-list>`
+      : html` <mdui-list>
+          <mdui-list-item>No credentials found.</mdui-list-item>
+        </mdui-list>`}`;
+    render(creds, list);
+  }
+
+  /**
+   * Create a new paskey and register the credential.
+   */
+  async function register() {
+    try {
+      loading.start();
+      await registerCredential();
+      await renderCredentials();
+      loading.stop();
+    } catch (e) {
+      // Stop the loading UI
+      loading.stop();
+      // 'InvalidStateError' indicates a passkey already exists on the device.
+      if (e.name === "InvalidStateError") {
+        alert("A passkey already exists for this device.");
+        // `NotAllowedError` indicates the user canceled the operation.
+      } else if (e.name === "NotAllowedError") {
+        return;
+        // Show other errors in an alert.
+      } else {
+        alert(e.message);
+        console.error(e);
+      }
+    }
+  }
+
+  loading.start();
+  renderDisplayName();
+  await renderProjects();
+  await renderCredentials();
+  loading.stop();
+</script>

@@ -239,3 +239,25 @@ export async function getAllProjects() {
     throw new Error('Failed to fetch projects');
   }
 }
+
+/**
+ * Update a project's color.
+ * @param {string} projectId The project ID
+ * @param {string} color The new color value
+ * @returns a promise that resolves with the server response.
+ */
+export async function updateProjectColor(projectId, color) {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  const res = await fetch(`/api/projects/${projectId}/color`, {
+    method: 'PUT',
+    headers: headers,
+    body: JSON.stringify({ color }),
+  });
+  if (res.ok) {
+    return res.json();
+  } else {
+    throw new Error('Failed to update project color');
+  }
+}
