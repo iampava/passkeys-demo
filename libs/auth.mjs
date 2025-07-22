@@ -24,7 +24,7 @@ import {
   verifyAuthenticationResponse
 } from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
-import { Users, Credentials } from './db.mjs';
+import { Users, Credentials, Projects } from './db.mjs';
 import aaguids from 'aaguid' with { type: 'json' };
 import { config } from '../config.js';
 
@@ -68,7 +68,7 @@ router.post('/username', async (req, res) => {
   const { username } = req.body;
 
   try {
-     // Only check username, no need to check password as this is a mock
+    // Only check username, no need to check password as this is a mock
     if (username && /^[a-zA-Z0-9@\.\-_]+$/.test(username)) {
       // See if account already exists
       let user = await Users.findByUsername(username);
@@ -190,6 +190,12 @@ router.post('/removeKey', csrfCheck, sessionCheck, async (req, res) => {
 router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
   const { user } = res.locals;
   const { project_id } = req.body;
+
+  const project = await Projects.findById(project_id);
+  if (!project) {
+    return res.status(400).json({ error: 'Project not found.' });
+  }
+
   try {
     // Only allow 1 passkey per project. 
     const excludeCredentials = [];
@@ -215,9 +221,10 @@ router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
     const options = await generateRegistrationOptions({
       rpName: config.rp_name,
       rpID: config.hostname,
-      userID: isoBase64URL.toBuffer(user.id),
-      userName: user.username,
-      userDisplayName: user.displayName || user.username,
+      // This allows us to have multiple passkeys.
+      userID: Buffer.from(`${project.id}:${user.id}`),
+      userName: project.name,
+      userDisplayName: project.name,
       // Prompt users for additional information about the authenticator.
       attestationType,
       // Prevent users from re-registering existing authenticators
@@ -287,7 +294,7 @@ router.post('/registerResponse', csrfCheck, sessionCheck, async (req, res) => {
     // Determine the name of the authenticator from the AAGUID.
     const name = (Object.keys(aaguids).length > 0 && aaguids[aaguid]?.name)
                   || req.useragent.platform;
-    
+
     // Store the registration result.
     await Credentials.update({
       id: credentialID,

@@ -114,6 +114,16 @@ export const Projects = {
     return projectWithId;
   },
 
+  findById: async (project_id) => {
+    const doc = await store.collection('projects').doc(project_id).get();
+    if (doc) {
+      const project = doc.data();
+      return project;
+    } else {
+      return null;
+    }
+  },
+
   list: async () => {
     const results = [];
     const refs = await store.collection('projects').get();
