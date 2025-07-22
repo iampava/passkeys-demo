@@ -161,6 +161,23 @@ app.get('/api/projects', async (req, res) => {
   }
 });
 
+app.put('/api/projects/:id/color', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { color } = req.body;
+    
+    if (!color) {
+      return res.status(400).json({ error: 'Color is required' });
+    }
+    
+    await Projects.updateColor(id, color);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to update project color:', error);
+    return res.status(500).json({ error: 'Failed to update project color' });
+  }
+});
+
 app.use('/auth', auth);
 
 async function initializeProjects() {
