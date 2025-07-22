@@ -202,6 +202,11 @@ app.put('/api/projects/:id/color', async (req, res) => {
       return res.status(403).json({ error: 'Invalid credential for current user' });
     }
     
+    // Verify the credential is tied to the specific project
+    if (cred.project_id !== id) {
+      return res.status(403).json({ error: 'This passkey is not associated with this project' });
+    }
+    
     // Construct the credential object for verification
     const credential = {
       id: cred.id,
