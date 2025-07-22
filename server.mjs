@@ -27,6 +27,7 @@ import useragent from 'express-useragent';
 import { FirestoreStore } from '@google-cloud/connect-firestore';
 import { config, store } from './config.js';
 import { auth } from './libs/auth.mjs';
+import { Projects } from './libs/db.mjs';
 
 const is_localhost = process.env.NODE_ENV === 'localhost';
 const title = config.rp_name;
@@ -152,6 +153,27 @@ app.get('/.well-known/passkey-endpoints', (req, res) => {
 
 app.use('/auth', auth);
 
-const listener = app.listen(process.env.PORT || 8080, () => {
+async function initializeProjects() {
+  try {
+    const existingProjects = await Projects.list();
+    if (existingProjects.length === 0) {
+      const dummyProjects = [
+        { name: 'Website Redesign', color: '#FF6B6B' },
+        { name: 'Mobile App', color: '#4ECDC4' },
+        { name: 'API Development', color: '#45B7D1' }
+      ];
+      
+      for (const project of dummyProjects) {
+        await Projects.add(project);
+      }
+      console.log('Initialized database with dummy projects');
+    }
+  } catch (error) {
+    console.error('Failed to initialize projects:', error);
+  }
+}
+
+const listener = app.listen(process.env.PORT || 8080, async () => {
   console.log('Your app is listening on port ' + listener.address().port);
+  await initializeProjects();
 });
