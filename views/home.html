@@ -54,6 +54,10 @@
         <h3>Your display name:</h3>
         <div id="display-name"></div>
       </section>
+      <section class="projects-card">
+        <h3>Projects:</h3>
+        <div id="projects-list"></div>
+      </section>
       <section>
         <h3>Your registered passkeys:</h3>
         <div id="list"></div>
@@ -77,7 +81,8 @@
         updateCredential,
         unregisterCredential,
         getAllCredentials,
-        updateCurrentUserDetails
+        updateCurrentUserDetails,
+        getAllProjects
       } from '/client.js';
       import { html, render } from 'https://unpkg.com/lit-html@2.6.1/lit-html.js?module';
       const aaguids = await fetch('/auth/aaguids').then(res => res.json());
@@ -113,6 +118,35 @@
           </mdui-list-item>
         <mwc-list>`, $('#display-name'));
         await updateCurrentUserDetails(res.rpId, res.id, res.username, res.displayName);
+      };
+
+      /**
+       * Render the list of projects.
+       */
+      async function renderProjects() {
+        try {
+          const projects = await getAllProjects();
+          const projectsList = $('#projects-list');
+          const projectsHtml = html`${projects.length > 0 ? html`
+          <mdui-list>${projects.map(project => html`
+            <mdui-list-item nonclickable>
+              <div style="width: 20px; height: 20px; background-color: ${project.color}; border-radius: 4px; margin-right: 12px;" slot="icon"></div>
+              ${project.name}
+              <div slot="description">ID: ${project.id}</div>
+            </mdui-list-item>`)}
+          </mdui-list>` : html`
+          <mdui-list>
+            <mdui-list-item>No projects found.</mdui-list-item>
+          </mdui-list>`}`;
+          render(projectsHtml, projectsList);
+        } catch (error) {
+          console.error('Failed to render projects:', error);
+          const projectsList = $('#projects-list');
+          render(html`
+          <mdui-list>
+            <mdui-list-item>Failed to load projects.</mdui-list-item>
+          </mdui-list>`, projectsList);
+        }
       };
 
       /**
@@ -259,6 +293,7 @@
 
       loading.start();
       renderDisplayName();
+      await renderProjects();
       await renderCredentials();
       loading.stop();
 

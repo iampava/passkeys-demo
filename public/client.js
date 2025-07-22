@@ -226,3 +226,16 @@ export async function updateCurrentUserDetails(rpId, userId, name, displayName) 
     });
   }
 }
+
+/**
+ * Fetch all projects from the API.
+ * @returns a promise that resolves with an array of projects.
+ */
+export async function getAllProjects() {
+  const res = await fetch('/api/projects');
+  if (res.ok) {
+    return res.json();
+  } else {
+    throw new Error('Failed to fetch projects');
+  }
+}
