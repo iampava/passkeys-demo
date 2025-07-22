@@ -124,8 +124,8 @@
     try {
       loading.start();
       
-      // First get authentication options from server
-      const authOptions = await post('/auth/signinRequest');
+      // First get authentication options from server, filtered for this project
+      const authOptions = await post('/auth/signinRequest', { project_id: projectId });
       
       // Convert the options for WebAuthn
       const options = PublicKeyCredential.parseRequestOptionsFromJSON(authOptions);

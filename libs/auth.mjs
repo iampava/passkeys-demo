@@ -329,6 +329,8 @@ router.post('/registerResponse', csrfCheck, sessionCheck, async (req, res) => {
 router.post('/signinRequest', csrfCheck, async (req, res) => {
   const allowCredentials = [];
 
+  const { project_id } = req.body;
+
   if (req.session['signed-in'] && req.session.username) {
     const user = await Users.findByUsername(req.session.username);
     if (!user) {
@@ -336,11 +338,14 @@ router.post('/signinRequest', csrfCheck, async (req, res) => {
     }
     const credentials = await Credentials.findByUserId(user.id);
     for (const cred of credentials) {
-      allowCredentials.push({
-        id: cred.id,
-        type: 'public-key',
-        transports: cred.transports,
-      });
+      // If project_id is specified, only include credentials for that project
+      if (!project_id || cred.project_id === project_id) {
+        allowCredentials.push({
+          id: cred.id,
+          type: 'public-key',
+          transports: cred.transports,
+        });
+      }
     }
   }
   try {
