@@ -63,13 +63,6 @@
         <div id="list"></div>
       </section>
       <p id="message" class="instructions"></p>
-      <mdui-button
-        id="create-passkey"
-        class="hidden"
-        icon="fingerprint"
-        variant="tonal">
-        Create a passkey
-      </mdui-button>
       <mdui-button variant="outlined" href="/auth/signout">Sign out</mdui-button>
     </main>
     <script type="module">
@@ -127,12 +120,29 @@
         try {
           const projects = await getAllProjects();
           const projectsList = $('#projects-list');
+          
+          // Check WebAuthn capability
+          let showCreateButton = false;
+          if (window.PublicKeyCredential) {
+            const capabilities = await PublicKeyCredential.getClientCapabilities();
+            showCreateButton = capabilities.conditionalGet && capabilities.userVerifyingPlatformAuthenticator;
+          }
+          
           const projectsHtml = html`${projects.length > 0 ? html`
-          <mdui-list>${projects.map(project => html`
+          <mdui-list style="width: 100%;">${projects.map(project => html`
             <mdui-list-item nonclickable>
               <div style="width: 20px; height: 20px; background-color: ${project.color}; border-radius: 4px; margin-right: 12px;" slot="icon"></div>
               ${project.name}
               <div slot="description">ID: ${project.id}</div>
+              ${showCreateButton ? html`
+              <mdui-button
+                class="create-passkey-btn"
+                icon="fingerprint"
+                variant="tonal"
+                @click="${register}"
+                slot="end-icon">
+                Create passkey
+              </mdui-button>` : ''}
             </mdui-list-item>`)}
           </mdui-list>` : html`
           <mdui-list>
@@ -186,21 +196,14 @@
         }
       };
 
-      const createPasskey = $('#create-passkey');
-
-      // Is WebAuthn available on this browser?
-      if (window.PublicKeyCredential) {
+      // Check WebAuthn capability for messaging
+      if (!window.PublicKeyCredential) {
+        $('#message').innerText = 'This device does not support passkeys.';
+      } else {
         const capabilities = await PublicKeyCredential.getClientCapabilities();
-        if (capabilities.conditionalGet &&
-            capabilities.userVerifyingPlatformAuthenticator) {
-          createPasskey.classList.remove('hidden');
-        } else {
-          // If either is not available, show a message.
+        if (!capabilities.conditionalGet || !capabilities.userVerifyingPlatformAuthenticator) {
           $('#message').innerText = 'This device does not support passkeys.';
         }
-      } else {
-        // If the condition does not match, show a message.
-        $('#message').innerText = 'This device does not support passkeys.';
       }
 
       /**
@@ -296,6 +299,4 @@
       await renderProjects();
       await renderCredentials();
       loading.stop();
-
-      createPasskey.addEventListener('click', register);
     </script>
