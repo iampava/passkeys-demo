@@ -1,15 +1,15 @@
 <div id="help">
   <div class="help-headline">Manage passkeys</div>
   <div class="help-content">
-    Edit your display name, create a passkey, or manage your passkeys. Once you
+    Edit your display name, create project-specific passkeys, or manage your passkeys. Once you
     create your first passkey, sign out and try signing in with it. ### Display
     name Created passkeys are saved with your username and a display name. Edit
     your display name to see how it appears in the account selection of your
     passkey sign-in. If the browser and the password manager support the [Signal
     API](https://developer.chrome.com/docs/identity/webauthn-signal-api),
     updated display name can be reflected to passkeys stored to the password
-    manager. ### Create a passkey Press **Create a passkey** to create a new
-    passkey. The passkey is named based on its
+    manager. ### Create a passkey Press **Create passkey** next to a project to create a new
+    passkey associated with that project. The passkey is named based on its
     [AAGUID](https://web.dev/articles/webauthn-aaguid), but you can change it as
     you want. ### Manage passkeys Press the **Edit** button to rename a passkey,
     or press the **Delete** button to remove it. If the browser and the password
@@ -37,10 +37,6 @@
     <h3>Projects:</h3>
     <div id="projects-list"></div>
   </section>
-  <section>
-    <h3>Your registered passkeys:</h3>
-    <div id="list"></div>
-  </section>
   <p id="message" class="instructions"></p>
   <mdui-button variant="outlined" href="/auth/signout">Sign out</mdui-button>
 </main>
@@ -57,6 +53,7 @@
     getAllProjects,
     updateProjectColor,
     authenticate,
+    fetchProjectName,
   } from "/client.js";
   import {
     html,
@@ -165,7 +162,7 @@
   }
 
   /**
-   * Render the list of projects.
+   * Render the list of projects with their associated passkeys.
    */
   async function renderProjects() {
     try {
@@ -173,6 +170,15 @@
       const credentials = await getAllCredentials();
       const hasPasskeys = credentials.length > 0;
       const projectsList = $("#projects-list");
+
+      // Group credentials by project_id
+      const credentialsByProject = credentials.reduce((acc, cred) => {
+        if (!acc[cred.project_id]) {
+          acc[cred.project_id] = [];
+        }
+        acc[cred.project_id].push(cred);
+        return acc;
+      }, {});
 
       // Check WebAuthn capability
       let showCreateButton = false;
@@ -184,38 +190,117 @@
       }
 
       const projectsHtml = html`${projects.length > 0
-        ? html` <mdui-list style="width: 100%;"
-            >${projects.map(
-              (project) => html` <mdui-list-item nonclickable>
-                <input
-                  type="color"
-                  value="${project.color}"
-                  data-project-id="${project.id}"
-                  data-original-color="${project.color}"
-                  @change="${changeProjectColor}"
-                  style="width: 42px; height: 42px; border: none; border-radius: 4px; cursor: pointer; ${!hasPasskeys ? 'opacity: 0.5; cursor: not-allowed;' : ''}"
-                  slot="icon"
-                  title="${hasPasskeys ? 'Click to change color (requires passkey)' : 'Create a passkey first to change colors'}"
-                  ?disabled="${!hasPasskeys}"
-                />
-                ${project.name}
-                <div slot="description">ID: ${project.id}${!hasPasskeys ? ' • Create a passkey to edit color' : ''}</div>
-                ${showCreateButton
-                  ? html` <mdui-button
-                      class="create-passkey-btn"
-                      icon="fingerprint"
-                      variant="tonal"
-                      @click="${register}"
-                      slot="end-icon"
-                    >
-                      Create passkey
-                    </mdui-button>`
-                  : ""}
-              </mdui-list-item>`
-            )}
-          </mdui-list>`
+        ? html` <div>
+            ${projects.map((project, index) => {
+              const projectCredentials = credentialsByProject[project.id] || [];
+              return html`
+                <div>
+                  <!-- Project Header -->
+                  <mdui-list style="width: 100%">
+                    <mdui-list-item  nonclickable>
+                      <input
+                        type="color"
+                        value="${project.color}"
+                        data-project-id="${project.id}"
+                        data-original-color="${project.color}"
+                        @change="${changeProjectColor}"
+                        style="width: 42px; height: 42px; border: none; border-radius: 4px; cursor: pointer; ${!hasPasskeys ? 'opacity: 0.5; cursor: not-allowed;' : ''}"
+                        slot="icon"
+                        title="${hasPasskeys ? 'Click to change color (requires passkey)' : 'Create a passkey first to change colors'}"
+                        ?disabled="${!hasPasskeys}"
+                      />
+                      <strong>${project.name}</strong>
+                      <div slot="description">ID: ${project.id}${!hasPasskeys ? ' • Create a passkey to edit color' : ''}</div>
+                      ${showCreateButton
+                        ? html` <mdui-button
+                            class="create-passkey-btn"
+                            icon="fingerprint"
+                            variant="tonal"
+                            data-project-id="${project.id}"
+                            @click="${registerForProject}"
+                            slot="end-icon"
+                          >
+                            Create passkey
+                          </mdui-button>`
+                        : ""}
+                    </mdui-list-item>
+                  </mdui-list>
+
+                  <!-- Project Passkeys -->
+                  ${projectCredentials.length > 0 ? html`
+                    <div style="margin-left: 20px; margin-top: 8px;">
+                      <strong style="font-size: 14px; color: #666;">Passkeys:</strong>
+                      <mdui-list style="margin-top: 4px;">
+                        ${projectCredentials.map((cred) => {
+                          const created = new Date(cred.registered);
+                          const createdDate = created.toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          });
+                          const createdTime = created.toLocaleTimeString(undefined, {
+                            timeStyle: "short",
+                            hour12: false,
+                          });
+                          const createdStr = `Created: ${createdDate}, ${createdTime}`;
+                          let lastUsedStr = "";
+                          if (cred.last_used) {
+                            const lastUsed = new Date(cred.last_used);
+                            const lastUsedDate = lastUsed.toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            });
+                            const lastUsedTime = lastUsed.toLocaleTimeString(undefined, {
+                              timeStyle: "short",
+                              hour12: false,
+                            });
+                            lastUsedStr = cred.last_used
+                              ? `, Last Used: ${lastUsedDate}, ${lastUsedTime}`
+                              : "";
+                          }
+                          return html` <mdui-list-item nonclickable>
+                            ${cred.aaguid &&
+                            cred.aaguid !== "00000000-0000-0000-0000-000000000000"
+                              ? html`
+                                  <mdui-icon
+                                    slot="icon"
+                                    nonclickable
+                                    src="${aaguids[cred.aaguid].icon_light}"
+                                  ></mdui-icon>
+                                `
+                              : ""}
+                            ${cred.name || "Unnamed"}
+                            <div slot="description">${createdStr}${lastUsedStr}</div>
+                            <div class="buttons" slot="end-icon">
+                              ${cred.be === false
+                                ? html` <mdui-button-icon
+                                    icon="sync_disabled"
+                                  ></mdui-button-icon>`
+                                : ""}
+                              <mdui-button-icon
+                                data-cred-id="${cred.id}"
+                                data-name="${cred.name || "Unnamed"}"
+                                @click="${rename}"
+                                icon="edit"
+                              ></mdui-button-icon>
+                              <mdui-button-icon
+                                data-cred-id="${cred.id}"
+                                @click="${remove}"
+                                icon="delete"
+                              ></mdui-button-icon>
+                            </div>
+                          </mdui-list-item>`;
+                        })}
+                      </mdui-list>
+                    </div>` : ''}
+                  
+                  <!-- HR separator between projects (except for last project) -->
+                  ${index < projects.length - 1 ? html`<hr style="margin: 20px 0; border: 0; border-top: 1px solid #e0e0e0;">` : ''}
+                </div>
+              `;
+            })}
+          </div>`
         : html` <mdui-list>
-            <mdui-list-item>No projects found.</mdui-list-item>
+            <mdui-list-item>No projects found. Projects are required to create passkeys.</mdui-list-item>
           </mdui-list>`}`;
       render(projectsHtml, projectsList);
     } catch (error) {
@@ -240,7 +325,7 @@
     try {
       loading.start();
       await updateCredential(credId, newName);
-      await renderCredentials();
+      await renderProjects();
       loading.stop();
     } catch (e) {
       loading.stop();
@@ -258,7 +343,7 @@
     try {
       loading.start();
       await unregisterCredential(e.target.dataset.credId);
-      await renderCredentials();
+      await renderProjects();
       loading.stop();
     } catch (e) {
       loading.stop();
@@ -280,89 +365,17 @@
     }
   }
 
-  /**
-   * Render the list of saved credentials.
-   */
-  async function renderCredentials() {
-    // TODO: What if this get exception?
-    const res = await getAllCredentials();
-    const list = $("#list");
-    const creds = html`${res.length > 0
-      ? html` <mdui-list
-          >${res.map((cred) => {
-            const created = new Date(cred.registered);
-            const createdDate = created.toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-            });
-            const createdTime = created.toLocaleTimeString(undefined, {
-              timeStyle: "short",
-              hour12: false,
-            });
-            const createdStr = `Created: ${createdDate}, ${createdTime}`;
-            let lastUsedStr = "";
-            if (cred.last_used) {
-              const lastUsed = new Date(cred.last_used);
-              const lastUsedDate = lastUsed.toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-              });
-              const lastUsedTime = lastUsed.toLocaleTimeString(undefined, {
-                timeStyle: "short",
-                hour12: false,
-              });
-              lastUsedStr = cred.last_used
-                ? `, Last Used: ${lastUsedDate}, ${lastUsedTime}`
-                : "";
-            }
-            return html` <mdui-list-item nonclickable>
-              ${cred.aaguid &&
-              cred.aaguid !== "00000000-0000-0000-0000-000000000000"
-                ? html`
-                    <mdui-icon
-                      slot="icon"
-                      nonclickable
-                      src="${aaguids[cred.aaguid].icon_light}"
-                    ></mdui-icon>
-                  `
-                : ""}
-              ${cred.name || "Unnamed"}
-              <div slot="description">${createdStr}${lastUsedStr}</div>
-              <div class="buttons" slot="end-icon">
-                ${cred.be === false
-                  ? html` <mdui-button-icon
-                      icon="sync_disabled"
-                    ></mdui-button-icon>`
-                  : ""}
-                <mdui-button-icon
-                  data-cred-id="${cred.id}"
-                  data-name="${cred.name || "Unnamed"}"
-                  @click="${rename}"
-                  icon="edit"
-                ></mdui-button-icon>
-                <mdui-button-icon
-                  data-cred-id="${cred.id}"
-                  @click="${remove}"
-                  icon="delete"
-                ></mdui-button-icon>
-              </div>
-            </mdui-list-item>`;
-          })}
-        </mdui-list>`
-      : html` <mdui-list>
-          <mdui-list-item>No credentials found.</mdui-list-item>
-        </mdui-list>`}`;
-    render(creds, list);
-  }
+
 
   /**
-   * Create a new paskey and register the credential.
+   * Create a new passkey associated with a specific project.
    */
-  async function register() {
+  async function registerForProject(e) {
+    const projectId = e.target.dataset.projectId;
     try {
       loading.start();
-      await registerCredential();
-      await renderCredentials();
+      await registerCredential(projectId);
+      await renderProjects(); // Re-render projects to update UI with new passkey
       loading.stop();
     } catch (e) {
       // Stop the loading UI
@@ -384,6 +397,5 @@
   loading.start();
   renderDisplayName();
   await renderProjects();
-  await renderCredentials();
   loading.stop();
 </script>

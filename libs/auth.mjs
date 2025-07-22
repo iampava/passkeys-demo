@@ -189,17 +189,21 @@ router.post('/removeKey', csrfCheck, sessionCheck, async (req, res) => {
  */
 router.post('/registerRequest', csrfCheck, sessionCheck, async (req, res) => {
   const { user } = res.locals;
+  const { project_id } = req.body;
   try {
-    // Create `excludeCredentials` from a list of stored credentials.
+    // Only allow 1 passkey per project. 
     const excludeCredentials = [];
     const credentials = await Credentials.findByUserId(user.id);
     for (const cred of credentials) {
-      excludeCredentials.push({
-        id: cred.id,
-        type: 'public-key',
-        transports: cred.transports,
-      });
+      if (cred.project_id === project_id) {
+        excludeCredentials.push({
+          id: cred.id,
+          type: 'public-key',
+          transports: cred.transports,
+        });
+      }
     }
+
     // Set `authenticatorSelection`.
     const authenticatorSelection = {
       authenticatorAttachment: 'platform',
@@ -240,7 +244,12 @@ router.post('/registerResponse', csrfCheck, sessionCheck, async (req, res) => {
   const expectedChallenge = req.session.challenge;
   const expectedOrigin = config.associated_origins;
   const expectedRPID = config.hostname;
-  const credential = req.body;
+  const { credential, project_id } = req.body;
+
+  // Require project_id for all passkey creation
+  if (!project_id) {
+    return res.status(400).json({ error: 'project_id is required for passkey creation' });
+  }
 
   try {
 
@@ -291,6 +300,7 @@ router.post('/registerResponse', csrfCheck, sessionCheck, async (req, res) => {
       last_used: null,
       be: credentialDeviceType === 'multiDevice',
       user_id: user.id,
+      project_id,
     });
 
     // Delete the challenge from the session.

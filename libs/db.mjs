@@ -53,7 +53,7 @@ export const Users = {
 }
 
 /**
- * User data schema
+ * Credential data schema
  * {
  *   id: string Base64URL encoded CredentialID,
  *   publicKey: string Base64URL encoded PublicKey,
@@ -62,6 +62,7 @@ export const Users = {
  *   registered: timestamp,
  *   last_used: timestamp,
  *   user_id: string Base64URL encoded user ID of the owner,
+ *   project_id: string ID of the associated project
  * }
  **/
 

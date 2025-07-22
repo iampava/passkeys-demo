@@ -78,11 +78,17 @@ const metadata = {
 
 /**
  * Create and register a new passkey
+ * @param {string} project_id Required project ID to associate with the passkey
  * @returns A promise that resolves with a server response.
  */
-export async function registerCredential() {
+export async function registerCredential(project_id) {
+  if (!project_id) {
+    throw new Error('project_id is required for passkey creation');
+  }
   // Fetch passkey creation options from the server.
-  const _options = await post('/auth/registerRequest');
+  const _options = await post('/auth/registerRequest', {
+    project_id,
+  });
 
   // Base64URL decode some values
   const options = PublicKeyCredential.parseCreationOptionsFromJSON(_options);
@@ -102,7 +108,8 @@ export async function registerCredential() {
 
   // Send the result to the server and return the promise.
   try {
-    const result = await post('/auth/registerResponse', credential);
+    const payload = { credential, project_id };
+    const result = await post('/auth/registerResponse', payload);
     return result;
   } catch (e) {
     // Detect if the credential was not found.
@@ -238,6 +245,12 @@ export async function getAllProjects() {
   } else {
     throw new Error('Failed to fetch projects');
   }
+}
+
+export async function fetchProjectName(projectId) {
+  const projects = await getAllProjects();
+  const project = projects.find(p => p.id === projectId);
+  return project?.name ?? "N/A";
 }
 
 /**
