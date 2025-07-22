@@ -95,3 +95,33 @@ export const Credentials = {
     return ref.delete();
   }
 }
+
+/**
+ * Project data schema
+ * {
+ *   id: string project ID,
+ *   name: string project name,
+ *   color: string project color,
+ * }
+ **/
+
+export const Projects = {
+  add: async (project) => {
+    const ref = store.collection('projects').doc();
+    const projectWithId = { ...project, id: ref.id };
+    await ref.set(projectWithId);
+    return projectWithId;
+  },
+
+  list: async () => {
+    const results = [];
+    const refs = await store.collection('projects').get();
+    refs.forEach(project => results.push(project.data()));
+    return results;
+  },
+
+  updateColor: async (id, color) => {
+    const ref = store.collection('projects').doc(id);
+    return ref.update({ color });
+  }
+}
