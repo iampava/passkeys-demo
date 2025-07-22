@@ -27,7 +27,9 @@ import useragent from 'express-useragent';
 import { FirestoreStore } from '@google-cloud/connect-firestore';
 import { config, store } from './config.js';
 import { auth } from './libs/auth.mjs';
-import { Projects } from './libs/db.mjs';
+import { Projects, Credentials, Users } from './libs/db.mjs';
+import { verifyAuthenticationResponse } from '@simplewebauthn/server';
+import { isoBase64URL } from '@simplewebauthn/server/helpers';
 
 const is_localhost = process.env.NODE_ENV === 'localhost';
 const title = config.rp_name;
@@ -163,13 +165,68 @@ app.get('/api/projects', async (req, res) => {
 
 app.put('/api/projects/:id/color', async (req, res) => {
   try {
+    // Check if user is signed in
+    if (!req.session['signed-in'] || !req.session.username) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
     const { id } = req.params;
-    const { color } = req.body;
+    const { color, authResponse } = req.body;
     
     if (!color) {
       return res.status(400).json({ error: 'Color is required' });
     }
     
+    if (!authResponse) {
+      return res.status(400).json({ error: 'Passkey authentication required' });
+    }
+    
+    // Verify the passkey authentication
+    const expectedChallenge = req.session.challenge;
+    if (!expectedChallenge) {
+      return res.status(400).json({ error: 'No authentication challenge found. Please authenticate first.' });
+    }
+    
+    const expectedOrigin = config.associated_origins;
+    const expectedRPID = config.hostname;
+    
+    // Find the matching credential from the credential ID
+    const cred = await Credentials.findById(authResponse.id);
+    if (!cred) {
+      return res.status(404).json({ error: 'Credential not found' });
+    }
+    
+    // Verify the credential belongs to the current user
+    const user = await Users.findById(cred.user_id);
+    if (!user || user.username !== req.session.username) {
+      return res.status(403).json({ error: 'Invalid credential for current user' });
+    }
+    
+    // Construct the credential object for verification
+    const credential = {
+      id: cred.id,
+      publicKey: isoBase64URL.toBuffer(cred.publicKey),
+      transports: cred.transports,
+    };
+    
+    // Verify the authentication response
+    const verification = await verifyAuthenticationResponse({
+      response: authResponse,
+      expectedChallenge,
+      expectedOrigin,
+      expectedRPID,
+      credential,
+      requireUserVerification: false,
+    });
+    
+    if (!verification.verified) {
+      return res.status(403).json({ error: 'Authentication verification failed' });
+    }
+    
+    // Clear the challenge after successful verification
+    delete req.session.challenge;
+    
+    // Update the project color
     await Projects.updateColor(id, color);
     return res.json({ success: true });
   } catch (error) {

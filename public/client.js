@@ -241,23 +241,25 @@ export async function getAllProjects() {
 }
 
 /**
- * Update a project's color.
+ * Update a project's color with passkey authentication.
  * @param {string} projectId The project ID
  * @param {string} color The new color value
+ * @param {object} authResponse The passkey authentication response
  * @returns a promise that resolves with the server response.
  */
-export async function updateProjectColor(projectId, color) {
+export async function updateProjectColor(projectId, color, authResponse) {
   const headers = {
     'Content-Type': 'application/json',
   };
   const res = await fetch(`/api/projects/${projectId}/color`, {
     method: 'PUT',
     headers: headers,
-    body: JSON.stringify({ color }),
+    body: JSON.stringify({ color, authResponse }),
   });
   if (res.ok) {
     return res.json();
   } else {
-    throw new Error('Failed to update project color');
+    const error = await res.json();
+    throw new Error(error.error || 'Failed to update project color');
   }
 }
